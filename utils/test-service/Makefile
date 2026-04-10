@@ -28,10 +28,10 @@ endef
 
 define Package/test-service/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(TOPDIR)/feeds/test_service/test-service/files/test-service.sh \
+	$(INSTALL_BIN) $(TOPDIR)/feeds/test_service/utils/test-service/files/test-service.sh \
 		$(1)/usr/bin/test-service.sh
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) $(TOPDIR)/feeds/test_service/test-service/files/test-service.init \
+	$(INSTALL_BIN) $(TOPDIR)/feeds/test_service/utils/test-service/files/test-service.init \
 		$(1)/etc/init.d/test-service
 endef
 
