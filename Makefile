@@ -1,13 +1,24 @@
-# Simple project Makefile
-# OpenWrt package is in test-service/Makefile
+CC := $(CROSS_COMPILE)gcc
 
-.PHONY: all clean install
+PKG_BUILD_DIR ?= .
+BIN_DIR = $(PKG_BUILD_DIR)/build/bin
 
-all:
-	@echo "Test service - shell script, nothing to compile"
+STAGING_DIR ?= /usr/local
+AMX_INC := $(STAGING_DIR)/usr/include
+AMX_LDIR := $(STAGING_DIR)/usr/lib
+
+CFLAGS += -I$(AMX_INC)
+LDFLAGS += -L$(AMX_LDIR) -lamxd -lamxo -lamxc -lamxp -lamxb
+
+.PHONY: all clean
+
+all: $(BIN_DIR)/test-service
+
+$(BIN_DIR)/test-service: src/main.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+$(BIN_DIR):
+	mkdir -p $@
 
 clean:
-	@echo "Nothing to clean"
-
-install:
-	install -D -m 755 test-service/files/test-service.sh /usr/bin/test-service.sh
+	rm -rf $(PKG_BUILD_DIR)/build/
