@@ -10,6 +10,7 @@
 #include <amxp/amxp.h>
 #include <amxd/amxd_dm.h>
 #include <amxd/amxd_object.h>
+#include <amxd/amxd_function.h>
 #include <amxd/amxd_transaction.h>
 #include <amxo/amxo.h>
 #include <amxb/amxb.h>
@@ -159,6 +160,19 @@ int main(void) {
     amxo_parser_parse_file(&g_parser,
                            "/etc/amx/test-service/test-service.odl",
                            amxd_dm_get_root(&g_dm));
+
+    /* Bind RPC implementations programmatically (ODL has no shared-lib import) */
+    amxd_object_t *ts_obj = amxd_dm_findf(&g_dm, "TestService.");
+    if (ts_obj) {
+        amxd_function_t *fn_set_mode = amxd_object_get_function(ts_obj, "SetMode");
+        amxd_function_t *fn_crash    = amxd_object_get_function(ts_obj, "Crash");
+        if (fn_set_mode) amxd_function_set_impl(fn_set_mode, ts_set_mode);
+        if (fn_crash)    amxd_function_set_impl(fn_crash,    ts_crash);
+        syslog(LOG_INFO, "test-service: RPCs bound (SetMode=%p Crash=%p)",
+               (void *)fn_set_mode, (void *)fn_crash);
+    } else {
+        syslog(LOG_WARNING, "test-service: TestService object not found in DM");
+    }
 
     amxb_be_load("/usr/bin/mods/amxb/mod-amxb-ubus.so");
     if (amxb_connect(&g_bus_ctx, "ubus:/var/run/ubus/ubus.sock") == 0) {
