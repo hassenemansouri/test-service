@@ -13,7 +13,7 @@ endif
 
 EXTRA_CFLAGS  := -I$(AMX_INC) -D_GNU_SOURCE
 EXTRA_LDFLAGS := $(if $(AMX_LDIR),-L$(AMX_LDIR),) \
-                 -lamxd -lamxo -lamxc -lamxp -lamxb
+                 -lamxd -lamxo -lamxc -lamxp -lamxb -lpthread
 
 .PHONY: all clean
 

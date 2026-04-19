@@ -1,7 +1,32 @@
 %define {
     object TestService {
-        string Status = "Running";
-        uint32 UptimeSeconds = 0;
+        %read-only string Status  = "Running";
+        %read-only uint32 UptimeSeconds = 0;
         string Version = "0.1.0";
+
+        /* Current stress mode — updated by SetMode() */
+        %read-only string Mode = "Idle";  /* "Idle" | "CPUStress" | "MemStress" */
+
+        /*
+         * SetMode(mode)
+         * Switch the service between stress modes.
+         *   mode = "Idle"      -> stop all stress, minimal CPU/mem
+         *   mode = "CPUStress" -> busy-loop all cores -> triggers HGWDoctor CPU anomaly
+         *   mode = "MemStress" -> allocate ~200 MB    -> triggers HGWDoctor memory anomaly
+         *
+         * ubus call TestService SetMode '{"mode":"CPUStress"}'
+         */
+        void SetMode(%in string mode)
+            <!import:test_service:ts_set_mode!>;
+
+        /*
+         * Crash()
+         * Exit immediately with non-zero status.
+         * hgw-doctor should detect the process missing and trigger ProcessRestart.
+         *
+         * ubus call TestService Crash '{}'
+         */
+        void Crash()
+            <!import:test_service:ts_crash!>;
     }
 }
