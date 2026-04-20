@@ -12,7 +12,7 @@
          * Switch the service between stress modes.
          *   mode = "Idle"      -> stop all stress, minimal CPU/mem
          *   mode = "CPUStress" -> busy-loop all cores -> triggers HGWDoctor CPU anomaly
-         *   mode = "MemStress" -> allocate ~200 MB    -> triggers HGWDoctor memory anomaly
+         *   mode = "MemStress" -> allocate ~600 MB    -> triggers HGWDoctor memory anomaly
          *
          * ubus call TestService SetMode '{"mode":"CPUStress"}'
          */

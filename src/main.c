@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <syslog.h>
@@ -189,19 +190,23 @@ int main(void) {
 
     syslog(LOG_INFO, "test-service running");
 
-    uint32_t uptime = 0;
+    time_t start_time = time(NULL);
     while (g_running) {
-        int fd = amxb_get_fd(g_bus_ctx);
-        if (fd >= 0) {
-            fd_set rfds;
-            struct timeval tv = {1, 0};
-            FD_ZERO(&rfds);
-            FD_SET(fd, &rfds);
-            if (select(fd + 1, &rfds, NULL, NULL, &tv) > 0)
-                amxb_read(g_bus_ctx);
+        if (g_bus_ctx != NULL) {
+            int fd = amxb_get_fd(g_bus_ctx);
+            if (fd >= 0) {
+                fd_set rfds;
+                struct timeval tv = {1, 0};
+                FD_ZERO(&rfds);
+                FD_SET(fd, &rfds);
+                if (select(fd + 1, &rfds, NULL, NULL, &tv) > 0)
+                    amxb_read(g_bus_ctx);
+            }
+        } else {
+            sleep(1);
         }
         amxp_signal_read();
-        dm_set_uint32("UptimeSeconds", ++uptime);
+        dm_set_uint32("UptimeSeconds", (uint32_t)(time(NULL) - start_time));
     }
 
     g_mode = 0;
