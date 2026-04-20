@@ -21,7 +21,9 @@
  * ------------------------------------------------------------------------- */
 static volatile sig_atomic_t g_running    = 1;
 static volatile int          g_mode       = 0; /* 0=idle 1=cpu 2=mem */
-static pthread_t             g_stress_tid = 0;
+#define MAX_CPU_THREADS 8
+static pthread_t             g_stress_tids[MAX_CPU_THREADS];
+static int                   g_stress_nthreads = 0;
 static void                 *g_mem_block  = NULL;
 
 static amxd_dm_t      g_dm;
@@ -38,45 +40,50 @@ static void sig_handler(int sig) {
 /* -------------------------------------------------------------------------
  * Stress thread
  * ------------------------------------------------------------------------- */
-static void *stress_thread(void *arg) {
-    int started_mode = *(int *)arg;
-    free(arg);
+static void *cpu_stress_thread(void *arg) {
+    (void)arg;
+    while (g_mode == 1) { /* busy loop */ }
+    return NULL;
+}
 
-    if (started_mode == 1) {
-        syslog(LOG_INFO, "test-service: CPU stress started");
-        while (g_mode == 1) { /* busy loop */ }
-        syslog(LOG_INFO, "test-service: CPU stress stopped");
-
-    } else if (started_mode == 2) {
-        const size_t sz = 200UL * 1024 * 1024;
-        g_mem_block = malloc(sz);
-        if (g_mem_block) {
-            memset(g_mem_block, 0xAA, sz);  /* touch every page */
-            syslog(LOG_INFO, "test-service: MemStress allocated 200 MB");
-        } else {
-            syslog(LOG_WARNING, "test-service: MemStress malloc failed");
-        }
-        while (g_mode == 2) sleep(1);
-        free(g_mem_block);
-        g_mem_block = NULL;
-        syslog(LOG_INFO, "test-service: MemStress released memory");
+static void *mem_stress_thread(void *arg) {
+    (void)arg;
+    const size_t sz = 600UL * 1024 * 1024; /* 600 MB — ~15% of 4 GB */
+    g_mem_block = malloc(sz);
+    if (g_mem_block) {
+        memset(g_mem_block, 0xAA, sz);  /* touch every page */
+        syslog(LOG_INFO, "test-service: MemStress allocated 600 MB");
+    } else {
+        syslog(LOG_WARNING, "test-service: MemStress malloc failed");
     }
-
+    while (g_mode == 2) sleep(1);
+    free(g_mem_block);
+    g_mem_block = NULL;
+    syslog(LOG_INFO, "test-service: MemStress released memory");
     return NULL;
 }
 
 static void start_stress(int mode) {
-    if (g_stress_tid) {
-        g_mode = 0;
-        pthread_join(g_stress_tid, NULL);
-        g_stress_tid = 0;
-    }
+    /* Stop any running stress threads */
+    g_mode = 0;
+    for (int i = 0; i < g_stress_nthreads; i++)
+        pthread_join(g_stress_tids[i], NULL);
+    g_stress_nthreads = 0;
+
     if (mode == 0) return;
 
     g_mode = mode;
-    int *arg = malloc(sizeof(int));
-    *arg = mode;
-    pthread_create(&g_stress_tid, NULL, stress_thread, arg);
+    if (mode == 1) {
+        /* One busy-loop thread per CPU core */
+        long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+        if (ncpu < 1) ncpu = 1;
+        if (ncpu > MAX_CPU_THREADS) ncpu = MAX_CPU_THREADS;
+        syslog(LOG_INFO, "test-service: CPU stress started (%ld threads)", ncpu);
+        for (long i = 0; i < ncpu; i++)
+            pthread_create(&g_stress_tids[g_stress_nthreads++], NULL, cpu_stress_thread, NULL);
+    } else if (mode == 2) {
+        pthread_create(&g_stress_tids[g_stress_nthreads++], NULL, mem_stress_thread, NULL);
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -197,7 +204,8 @@ int main(void) {
         dm_set_uint32("UptimeSeconds", ++uptime);
     }
 
-    if (g_stress_tid) { g_mode = 0; pthread_join(g_stress_tid, NULL); }
+    g_mode = 0;
+    for (int i = 0; i < g_stress_nthreads; i++) pthread_join(g_stress_tids[i], NULL);
     syslog(LOG_INFO, "test-service stopped");
     if (g_bus_ctx) { amxb_disconnect(g_bus_ctx); amxb_free(&g_bus_ctx); }
     amxb_be_remove_all();
